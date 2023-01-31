@@ -92,42 +92,45 @@ float_emulated float_emulated::operator*(const float_emulated& fe) {
 // changes:
 //    nothing
 float_emulated float_emulated::operator/(const float_emulated& fe) {
-	// reconstruct the multiplication operands from this and fe by adding the implied 1 back into the operands.
-    long s1 = fractional_bits + (1 << 23);
-    std::bitset<32> x(s1);
-    std::cout << x << '\n';
-    long s2 = fe.fractional_bits + (1 << 23);
-    std::bitset<32> y(s2);
-    std::cout << y << '\n';
+	// reconstruct the division operands from this and fe by adding the implied 1 back into the operands.
+    long numerator = this -> fractional_bits + (1 << 23);
+    long denominator = fe.fractional_bits + (1 << 23);
 	// divide the significands using the bitwise shift method mentioned in the text.
     // Perform the division to 25 bits of precision (for guard and round bits)
     long quotient = 0;
-    for (int i = 25; i >= 0; i--) {
-        quotient <<= 1;
-        s1 <<= 1;
-        if (s1 >= s2) {
-            s1 -= s2;
-            quotient |= 1;
+    for (int bit = 0; bit < 26; bit++) {
+        quotient = (quotient << 1);
+        if (numerator > denominator) {
+            numerator = numerator - denominator;
+            quotient = quotient + 1;
         }
+        numerator = numerator << 1;
     }
 	// shift the quotient to the left by one bit to make a place for the sticky bit.
     quotient <<= 1;
+
 	// if there is a remainder to the division, set the sticky bit in the quotient (bit 0)
-    if (s1) {
+    if (numerator) {
         quotient |= 1;
     }
+
 	// place the value of the quotient in the fractional bits field of the result, performing rounding and normalization
 	// as required.
 	// HINT: using the copy constructor or assigning from an int will do this for you using the instructor-provided code
-    float_emulated result = (const int)quotient;
+    float_emulated result = (int)quotient;
+
 	// remove the result of guard and round and sticky from the exponent by subtracting three from the result's exponent
     result.exponent -= 3;
+
 	// subtract 23 from the exponent related to the binary point of the quotient
     result.exponent -= 23;
+
 	// Add the difference of the original exponents to the result (making sure that extra bias is not included).
-    result.exponent += this->exponent - fe.exponent;
+    result.exponent += (exponent - 127) - (fe.exponent - 127);
+
 	// set the sign of the result
     result.sign = this->sign ^ fe.sign;
+
 	// return the result
     return result;
 }
@@ -157,30 +160,29 @@ float_emulated approximate_integral_float_emulated(float_emulated start_x, float
 int main() {
     printf("SER450 - Project 3 - Bichen Pang\n");
 
-//    // time for approximate_integral_float
-//    auto start = std::chrono::high_resolution_clock::now();
-//    // code to be timed
-//    float built_in = approximate_integral_float(0,10,10000000);
-//    auto end = std::chrono::high_resolution_clock::now();
-//    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-//    std::cout << "Total execution time float: " << duration.count() << " microseconds" << std::endl;
-//
-//    // time for approximate_integral_float_emulated
-//    auto start2 = std::chrono::high_resolution_clock::now();
-//    // code to be timed
-//    float float_emulated = approximate_integral_float_emulated(0,10,10000000);
-//    auto end2 = std::chrono::high_resolution_clock::now();
-//    auto duration2 = std::chrono::duration_cast<std::chrono::microseconds>(end2 - start2);
-//    //float_emulated = 51.305302;
-//    std::cout << "Total execution time float_emulated: " << duration2.count() << " microseconds" << std::endl;
+    // time for approximate_integral_float
+    auto start = std::chrono::high_resolution_clock::now();
+    // code to be timed
+    float built_in = approximate_integral_float(0,10,10000000);
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    std::cout << "Total execution time float: " << duration.count() << " microseconds" << std::endl;
 
-    class float_emulated x = 10;
-    class float_emulated y = 2;
-    float test =  x / y;
-    printf("%f\n", test);
+    // time for approximate_integral_float_emulated
+    auto start2 = std::chrono::high_resolution_clock::now();
+    // code to be timed
+    float float_emulated = approximate_integral_float_emulated(0,10,10000000);
+    auto end2 = std::chrono::high_resolution_clock::now();
+    auto duration2 = std::chrono::duration_cast<std::chrono::microseconds>(end2 - start2);
+    std::cout << "Total execution time float_emulated: " << duration2.count() << " microseconds" << std::endl;
 
-//    // display result
-//    printf("%f\n", built_in);
-//    printf("%f\n", float_emulated);
+//    class float_emulated x = 10;
+//    class float_emulated y = 2;
+//    float test =  x / y;
+//    printf("%f\n", test);
+
+    // display result
+    printf("%f\n", built_in);
+    printf("%f\n", float_emulated);
     return 0;
 }
