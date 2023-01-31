@@ -29,54 +29,24 @@
 float_emulated float_emulated::operator*(const float_emulated& fe) {
 	// reconstruct the multiplication operands from this and fe by adding the implied 1 back into the operands.
 	// NOTE: you may want to use a larger precision value these values so that you don't lose bits during the shifting operations.
-    unsigned long long s1 = fractional_bits + (1 << 23);
-    unsigned long long s2 = fe.fractional_bits + (1 << 23);
+    long long s1 = this -> fractional_bits + (1 << 23);
+    long long s2 = (long long)fe.fractional_bits + (1 << 23);
+
 	// multiply the significands using the bitwise shift method mentioned in the text.
 	// Hint: Make sure that the data type for your product variable is large enough to hold a 46-bit product.
-    unsigned long long product = 0, count = 0;
-    while (s2) {
-        // check for set bit and left
-        // shift n, count times
-        if (s2 % 2 == 1)
-            product += s1 << count;
-        // increment of place value (count)
-        count++;
-        s2 /= 2;
+    long long product = 0;
+    for (int bit = 0; bit < 24; bit++) {
+        if (s1 & 1) {
+            product += s2;
+        }
+        s2 = (s2 << 1);
+        s1 = (s1 >> 1);
     }
+
 	// The sticky bit should be true if any of the product bits b0 through b19 are non-zero.
-    long working_exponent = 0;
-    long sticky = 0;
-    if (exponent < fe.exponent) {
-        // denormalize s2
-        for (int bit = 0;bit < fe.exponent - exponent;bit++) {
-            if (s1 & 1) {
-                // if additional precision beyond guard and round
-                // has been lost, set the sticky bit
-                sticky |= 1;
-            }
-            s1 = (s1 >> 1);
-        }
-        // set the sticky bit for s1
-        s1 = (s1 & 0xfffffffe) + sticky;
-
-        // set the working expoent for this addition
-        working_exponent = fe.exponent;
-    }
-    else if (exponent >= fe.exponent) {
-        // denormalize s2
-        for (int bit = 0;bit < exponent - fe.exponent;bit++) {
-            if (s2 & 1) {
-                // if additional precision beyond guard and round
-                // has been lost, set the sticky bit
-                sticky |= 1;
-            }
-            s2 = (s2 >> 1);
-        }
-        // set the working exponent for this addition
-        working_exponent = exponent;
-
-        // set the sticky bit for s1
-        s2 = (s2 & 0xfffffffe) + sticky;
+    int sticky = 0;
+    if (product & 0xFFFFF) {
+        sticky = 1;
     }
 
 	// shift the product right by 20 bits and set bit 0 to the value of sticky. The value of the product bitfield should now hold
@@ -84,19 +54,26 @@ float_emulated float_emulated::operator*(const float_emulated& fe) {
 	//  bit 1,2   = extra precision bits (guard and round)
 	//  bit 3-25  = fractional bits from the product
 	//  bit 26-27 = non-fractional bits from the product
-    product >>= 20;
+    product = (product >> 20) | sticky;
 
 	// place the value of the product in the fractional bits field of the result, performing rounding and normalization as required.
 	// HINT: using the copy constructor or assigning from an int will do this for you using the instructor-provided code
-    float_emulated result = (const int)product;
+    float_emulated result = (int)product;
+
 	// remove the result of guard and round and sticky from the exponent by subtracting three from the result's exponent
     result.exponent -= 3;
+
 	// subtract 23 from the exponent related to the binary point of the product
     result.exponent -= 23;
+
 	// Add the sum of the original exponents to the result (making sure that extra bias is not included).
-    result.exponent += exponent + fe.exponent - 127;
+    result.exponent += (exponent - 127) + (fe.exponent - 127);
+
 	// set the sign of the result
-    result.sign = sign ^ fe.sign;
+    if (sign != fe.sign) {
+        result.sign = 1;
+    }
+
 	// return the result
     return result;
 }
